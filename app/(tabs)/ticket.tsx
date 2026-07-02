@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,10 +8,16 @@ const barcodeBars = [8, 3, 2, 7, 2, 3, 12, 4, 2, 9, 3, 6, 2, 12, 3, 2, 8, 4, 10,
 
 export default function TicketScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ cityCode?: string; cityName?: string; duration?: string; distance?: string; seat?: string }>();
   const insets = useSafeAreaInsets();
   const [isTorn, setIsTorn] = useState(false);
   const { width } = useWindowDimensions();
   const screenWidth = Math.min(width - 32, 430);
+  const cityCode = params.cityCode ?? 'ABQ';
+  const cityName = params.cityName ?? 'Albuquerque';
+  const duration = params.duration ?? '2h 3m';
+  const distance = params.distance ?? '896 mi';
+  const seat = params.seat ?? '01A';
 
   return (
     <View style={styles.root}>
@@ -44,7 +50,7 @@ export default function TicketScreen() {
               <Text style={styles.airportTagText}>▰ SFO</Text>
             </View>
             <View style={[styles.airportTag, styles.abqTag]}>
-              <Text style={styles.airportTagText}>▰ ABQ</Text>
+              <Text style={styles.airportTagText}>{cityCode}</Text>
             </View>
             <Text selectable style={styles.legalText}>Legal</Text>
           </View>
@@ -71,20 +77,20 @@ export default function TicketScreen() {
                 <Text selectable style={styles.cityText}>San Francisco</Text>
               </View>
               <View style={styles.rightCodeBlock}>
-                <Text selectable style={styles.bigCode}>ABQ</Text>
-                <Text selectable style={styles.cityText}>Albuquerque</Text>
+                <Text selectable style={styles.bigCode}>{cityCode}</Text>
+                <Text selectable style={styles.cityText}>{cityName}</Text>
               </View>
             </View>
-            <Text selectable numberOfLines={1} style={styles.durationText}>2h 3m</Text>
+            <Text selectable numberOfLines={1} style={styles.durationText}>{duration}</Text>
 
             <View style={styles.infoGrid}>
               <View style={styles.infoBlock}>
                 <Text selectable style={styles.infoLabel}>Seat</Text>
-                <Text selectable style={styles.infoValue}>01A</Text>
+                <Text selectable style={styles.infoValue}>{seat}</Text>
               </View>
               <View style={styles.infoBlockRight}>
                 <Text selectable style={styles.infoLabel}>Distance</Text>
-                <Text selectable style={styles.infoValue}>896 mi</Text>
+                <Text selectable style={styles.infoValue}>{distance}</Text>
               </View>
               <View style={styles.infoBlock}>
                 <Text selectable style={styles.infoLabel}>Boarding</Text>
@@ -100,7 +106,16 @@ export default function TicketScreen() {
             <View style={styles.notchLeft} />
             <View style={styles.notchRight} />
 
-            <Pressable accessibilityRole="button" accessibilityLabel="Tear boarding pass" onPress={() => (isTorn ? router.push('/takeoff') : setIsTorn(true))} style={[styles.barcode, isTorn && styles.tornBarcode]}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Tear boarding pass"
+              onPress={() => (isTorn
+                ? router.push({
+                    pathname: '/takeoff',
+                    params: { cityCode, cityName, duration, distance, seat },
+                  })
+                : setIsTorn(true))}
+              style={[styles.barcode, isTorn && styles.tornBarcode]}>
               {barcodeBars.map((height, index) => (
                 <View key={index} style={[styles.bar, { height: 40 + (height % 4) * 4, width: index % 5 === 0 ? 8 : 3 }]} />
               ))}

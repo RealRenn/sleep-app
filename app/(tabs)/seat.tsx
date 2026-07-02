@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ const seatColumns = ['A', 'C', 'D', 'F'];
 
 export default function SeatScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{ cityCode?: string; cityName?: string; duration?: string; distance?: string }>();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const [isChoosingSeat, setIsChoosingSeat] = useState(false);
@@ -53,7 +54,7 @@ export default function SeatScreen() {
 
           {!isChoosingSeat ? (
             <View style={styles.focusCard}>
-              <Text selectable style={styles.seatLabel}>Seat: 01A</Text>
+              <Text selectable style={styles.seatLabel}>Flight: SFO to {params.cityCode ?? 'ABQ'}</Text>
               <Text selectable style={styles.question}>What do you want to focus?</Text>
               <View style={styles.chipWrap}>
                 {focusOptions.map((option) => (
@@ -118,7 +119,18 @@ export default function SeatScreen() {
           </View>
 
           {selectedSeat ? (
-            <Pressable style={styles.confirmButton} onPress={() => router.push('/ticket')}>
+            <Pressable
+              style={styles.confirmButton}
+              onPress={() => router.push({
+                pathname: '/ticket',
+                params: {
+                  cityCode: params.cityCode ?? 'ABQ',
+                  cityName: params.cityName ?? 'Albuquerque',
+                  duration: params.duration ?? '2h 3m',
+                  distance: params.distance ?? '896 mi',
+                  seat: selectedSeat,
+                },
+              })}>
               <Text style={styles.confirmText}>Confirm</Text>
             </Pressable>
           ) : null}

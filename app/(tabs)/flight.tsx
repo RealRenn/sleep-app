@@ -8,18 +8,19 @@ type City = {
   code: string;
   name: string;
   time: string;
+  distance: string;
   top: number;
   left: number;
 };
 
 const cities: City[] = [
-  { code: 'YXC', name: 'Cranbrook', time: '2h 3m', top: 248, left: 106 },
-  { code: 'ABQ', name: 'Albuquerque', time: '2h 3m', top: 322, left: 286 },
-  { code: 'ALS', name: 'Alamosa', time: '2h 4m', top: 276, left: 340 },
-  { code: 'COD', name: 'Cody', time: '1h 57m', top: 210, left: 318 },
-  { code: 'BIL', name: 'Billings', time: '2h 0m', top: 182, left: 328 },
-  { code: 'SVC', name: 'Silver City', time: '2h 8m', top: 392, left: 350 },
-  { code: 'HMO', name: 'Hermosillo', time: '2h 12m', top: 474, left: 322 },
+  { code: 'YXC', name: 'Cranbrook', time: '2h 3m', distance: '901 mi', top: 248, left: 106 },
+  { code: 'ABQ', name: 'Albuquerque', time: '2h 3m', distance: '896 mi', top: 322, left: 286 },
+  { code: 'ALS', name: 'Alamosa', time: '2h 4m', distance: '843 mi', top: 276, left: 340 },
+  { code: 'COD', name: 'Cody', time: '1h 57m', distance: '738 mi', top: 210, left: 318 },
+  { code: 'BIL', name: 'Billings', time: '2h 0m', distance: '809 mi', top: 182, left: 328 },
+  { code: 'SVC', name: 'Silver City', time: '2h 8m', distance: '942 mi', top: 392, left: 350 },
+  { code: 'HMO', name: 'Hermosillo', time: '2h 12m', distance: '955 mi', top: 474, left: 322 },
 ];
 
 export default function FlightPickerScreen() {
@@ -138,7 +139,17 @@ export default function FlightPickerScreen() {
             })}
           </ScrollView>
 
-          <Pressable style={styles.bookButton} onPress={() => router.push('/seat')}>
+          <Pressable
+            style={styles.bookButton}
+            onPress={() => router.push({
+              pathname: '/seat',
+              params: {
+                cityCode: selectedCity.code,
+                cityName: selectedCity.name,
+                duration: selectedCity.time,
+                distance: selectedCity.distance,
+              },
+            })}>
             <Text style={styles.bookText}>Book My Flight</Text>
           </Pressable>
         </View>
