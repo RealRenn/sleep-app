@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Page = 'home' | 'calendar' | 'tasks' | 'analytics';
@@ -50,6 +50,9 @@ const moodCopy: Record<number, { label: string; tip: string }> = {
 export default function BalanceHomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const [isSignedIn, setIsSignedIn] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [page, setPage] = useState<Page>('home');
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const [mood, setMood] = useState(5);
@@ -70,6 +73,59 @@ export default function BalanceHomeScreen() {
   const planTomorrow = () => {
     setTasks((current) => [{ title: 'Lab report review', meta: 'Tomorrow, 25 min', done: false }, ...current]);
   };
+
+  if (!isSignedIn) {
+    return (
+      <View style={styles.signInRoot}>
+        <StatusBar style="light" />
+        <ScrollView
+          bounces={false}
+          contentInsetAdjustmentBehavior="automatic"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={[styles.signInContent, { paddingTop: insets.top + 48, paddingBottom: insets.bottom + 40 }]}>
+          <View style={styles.signInHero}>
+            <View style={styles.signInMark}>
+              <Text style={styles.signInMarkText}>Zz</Text>
+            </View>
+            <Text selectable style={styles.signInTitle}>Balance</Text>
+            <Text selectable style={styles.signInCopy}>Sign in to lock in your schedule, mood, and flight mode.</Text>
+          </View>
+
+          <View style={styles.signInCard}>
+            <Text selectable style={styles.signInLabel}>Email</Text>
+            <TextInput
+              autoCapitalize="none"
+              keyboardType="email-address"
+              onChangeText={setEmail}
+              placeholder="ren@example.com"
+              placeholderTextColor="#8d97a8"
+              style={styles.signInInput}
+              value={email}
+            />
+            <Text selectable style={styles.signInLabel}>Password</Text>
+            <TextInput
+              onChangeText={setPassword}
+              placeholder="Password"
+              placeholderTextColor="#8d97a8"
+              secureTextEntry
+              style={styles.signInInput}
+              value={password}
+            />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Sign in"
+              onPress={() => setIsSignedIn(true)}
+              style={styles.signInButton}>
+              <Text style={styles.signInButtonText}>Sign In</Text>
+            </Pressable>
+            <Pressable onPress={() => setIsSignedIn(true)} style={styles.demoButton}>
+              <Text style={styles.demoButtonText}>Continue as guest</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>
@@ -250,6 +306,20 @@ function NavButton({ label, active, onPress }: { label: string; active: boolean;
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#eef4f7' },
+  signInRoot: { flex: 1, backgroundColor: '#0f1726' },
+  signInContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 22 },
+  signInHero: { alignItems: 'center', gap: 12, marginBottom: 28 },
+  signInMark: { alignItems: 'center', backgroundColor: '#ffffff', borderRadius: 8, height: 64, justifyContent: 'center', width: 64 },
+  signInMarkText: { color: '#152033', fontSize: 20, fontWeight: '900' },
+  signInTitle: { color: '#ffffff', fontSize: 42, fontWeight: '900', lineHeight: 46 },
+  signInCopy: { color: '#b9c4d8', fontSize: 16, fontWeight: '700', lineHeight: 23, maxWidth: 300, textAlign: 'center' },
+  signInCard: { backgroundColor: '#ffffff', borderRadius: 8, gap: 10, padding: 18, boxShadow: '0 18px 48px rgba(0,0,0,0.24)' },
+  signInLabel: { color: '#152033', fontSize: 13, fontWeight: '900', textTransform: 'uppercase' },
+  signInInput: { backgroundColor: '#eef4f7', borderColor: '#dbe4ef', borderRadius: 8, borderWidth: 1, color: '#152033', fontSize: 16, fontWeight: '700', minHeight: 52, paddingHorizontal: 14 },
+  signInButton: { alignItems: 'center', backgroundColor: '#152033', borderRadius: 8, minHeight: 52, justifyContent: 'center', marginTop: 8 },
+  signInButtonText: { color: '#ffffff', fontSize: 16, fontWeight: '900' },
+  demoButton: { alignItems: 'center', minHeight: 44, justifyContent: 'center' },
+  demoButtonText: { color: '#6753dd', fontSize: 15, fontWeight: '900' },
   content: { paddingHorizontal: 16 },
   topbar: { alignItems: 'center', flexDirection: 'row', gap: 16, justifyContent: 'space-between', marginBottom: 22 },
   topbarText: { flex: 1 },
