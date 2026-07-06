@@ -55,6 +55,7 @@ export default function BalanceHomeScreen() {
   const [password, setPassword] = useState('');
   const [page, setPage] = useState<Page>('home');
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const [editingTaskIndex, setEditingTaskIndex] = useState<number | null>(null);
   const [mood, setMood] = useState(5);
   const [sleeping, setSleeping] = useState(false);
   const [handoffOpen, setHandoffOpen] = useState(false);
@@ -62,12 +63,25 @@ export default function BalanceHomeScreen() {
   const moodState = moodCopy[mood];
 
   const toggleTask = (index: number) => {
+    if (editingTaskIndex === index) {
+      return;
+    }
+
     setTasks((current) => current.map((task, taskIndex) => taskIndex === index ? { ...task, done: !task.done } : task));
   };
 
   const addTask = () => {
     setTasks((current) => [{ title: 'New focus block', meta: 'Today, 25 min', done: false }, ...current]);
+    setEditingTaskIndex(0);
     setPage('tasks');
+  };
+
+  const updateTask = (index: number, field: 'title' | 'meta', value: string) => {
+    setTasks((current) => current.map((task, taskIndex) => taskIndex === index ? { ...task, [field]: value } : task));
+  };
+
+  const saveTask = () => {
+    setEditingTaskIndex(null);
   };
 
   const planTomorrow = () => {
@@ -213,10 +227,39 @@ export default function BalanceHomeScreen() {
             <SectionTitle title="Tasks" meta={openTasks + ' open'} />
             <View style={styles.timeline}>
               {tasks.map((task, index) => (
-                <Pressable key={task.title + index} onPress={() => toggleTask(index)} style={[styles.taskRow, task.done && styles.taskDone]}>
-                  <View style={[styles.checkbox, task.done && styles.checkboxDone]} />
-                  <View><Text selectable style={styles.taskTitle}>{task.title}</Text><Text selectable style={styles.muted}>{task.meta}</Text></View>
-                </Pressable>
+                editingTaskIndex === index ? (
+                  <View key={'editing-' + index} style={styles.taskEditRow}>
+                    <TextInput
+                      autoFocus
+                      onChangeText={(value) => updateTask(index, 'title', value)}
+                      placeholder="Task name"
+                      placeholderTextColor="#8d97a8"
+                      style={styles.taskEditTitle}
+                      value={task.title}
+                    />
+                    <TextInput
+                      onChangeText={(value) => updateTask(index, 'meta', value)}
+                      placeholder="Today, 25 min"
+                      placeholderTextColor="#8d97a8"
+                      style={styles.taskEditMeta}
+                      value={task.meta}
+                    />
+                    <Pressable onPress={saveTask} style={styles.saveTaskButton}>
+                      <Text style={styles.saveTaskText}>Save</Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <Pressable key={task.title + index} onPress={() => toggleTask(index)} style={[styles.taskRow, task.done && styles.taskDone]}>
+                    <View style={[styles.checkbox, task.done && styles.checkboxDone]} />
+                    <View style={styles.taskTextBlock}>
+                      <Text selectable style={styles.taskTitle}>{task.title}</Text>
+                      <Text selectable style={styles.muted}>{task.meta}</Text>
+                    </View>
+                    <Pressable onPress={() => setEditingTaskIndex(index)} style={styles.editTaskButton}>
+                      <Text style={styles.editTaskText}>Edit</Text>
+                    </Pressable>
+                  </Pressable>
+                )
               ))}
             </View>
           </View>
@@ -387,7 +430,15 @@ const styles = StyleSheet.create({
   taskDone: { opacity: 0.55 },
   checkbox: { borderColor: '#768399', borderRadius: 5, borderWidth: 2, height: 20, width: 20 },
   checkboxDone: { backgroundColor: '#45a86e', borderColor: '#45a86e' },
+  taskTextBlock: { flex: 1 },
   taskTitle: { color: '#152033', fontSize: 16, fontWeight: '900' },
+  taskEditRow: { backgroundColor: '#ffffff', borderColor: '#6753dd', borderRadius: 8, borderWidth: 2, gap: 10, padding: 14 },
+  taskEditTitle: { backgroundColor: '#eef4f7', borderColor: '#dbe4ef', borderRadius: 8, borderWidth: 1, color: '#152033', fontSize: 16, fontWeight: '900', minHeight: 48, paddingHorizontal: 12 },
+  taskEditMeta: { backgroundColor: '#eef4f7', borderColor: '#dbe4ef', borderRadius: 8, borderWidth: 1, color: '#657189', fontSize: 14, fontWeight: '800', minHeight: 46, paddingHorizontal: 12 },
+  saveTaskButton: { alignItems: 'center', alignSelf: 'flex-start', backgroundColor: '#152033', borderRadius: 8, minHeight: 42, justifyContent: 'center', paddingHorizontal: 18 },
+  saveTaskText: { color: '#ffffff', fontSize: 14, fontWeight: '900' },
+  editTaskButton: { alignItems: 'center', borderColor: '#e4e9f1', borderRadius: 8, borderWidth: 1, minHeight: 38, justifyContent: 'center', paddingHorizontal: 12 },
+  editTaskText: { color: '#657189', fontSize: 13, fontWeight: '900' },
   metricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 14 },
   metric: { backgroundColor: '#ffffff', borderColor: '#e4e9f1', borderRadius: 8, borderWidth: 1, padding: 18, width: '48%' },
   metricLabel: { color: '#768399', fontWeight: '800' },
