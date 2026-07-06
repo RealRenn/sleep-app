@@ -9,6 +9,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "build:web": "expo export -p web",
+    "build:pages": "expo export -p web && node -e \"const fs=require('fs');fs.rmSync('docs',{recursive:true,force:true});fs.cpSync('dist','docs',{recursive:true});fs.writeFileSync('docs/.nojekyll','');\"",
     "predeploy": "expo export -p web",
     "deploy": "gh-pages -d dist",
     "lint": "expo lint"
