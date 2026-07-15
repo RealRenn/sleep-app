@@ -9,7 +9,7 @@ export default function TabLayout() {
         tabBarStyle: { display: 'none' },
       }}>
       <Tabs.Screen name="index" options={{ title: 'Balance' }} />
-      <Tabs.Screen name="flight" options={{ href: null, title: 'Book Flight' }} />
+      <Tabs.Screen name="flight" options={{ href: null, title: 'Rewards' }} />
       <Tabs.Screen name="seat" options={{ href: null, title: 'Seat 01A' }} />
       <Tabs.Screen name="ticket" options={{ href: null, title: 'Check In' }} />
       <Tabs.Screen name="takeoff" options={{ href: null, title: 'Ready' }} />

@@ -1,10 +1,36 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+  awardTaskReward,
+  loadRewardProgress,
+  redeemReward,
+  REDEEM_REWARDS,
+  RewardProgress,
+  TASK_HEALTH_REWARD,
+} from '@/constants/rewards';
 
 type Page = 'home' | 'calendar' | 'tasks' | 'analytics';
+type GraphMetric = 'focus' | 'tasks' | 'sleep' | 'mood';
+
+type WeeklyGraphConfig = {
+  title: string;
+  axis: string;
+  unit: string;
+  values: number[];
+  min: number;
+  max: number;
+  ticks: number[];
+};
+
+const weeklyGraphs: Record<GraphMetric, WeeklyGraphConfig> = {
+  focus: { title: 'Weekly focus trend', axis: 'FOCUS HOURS', unit: 'h', values: [8.4, 11.6, 9.8, 14.2, 12.5, 15.4, 14.3], min: 7, max: 16, ticks: [16, 14, 12, 10, 8, 7] },
+  tasks: { title: 'Weekly tasks trend', axis: 'TASKS COMPLETED', unit: '', values: [2, 4, 3, 6, 5, 7, 5], min: 0, max: 8, ticks: [8, 6, 4, 2, 0] },
+  sleep: { title: 'Weekly sleep trend', axis: 'SLEEP HOURS', unit: 'h', values: [7.2, 8.1, 6.8, 7.6, 7.1, 8.4, 7.8], min: 6, max: 9, ticks: [9, 8, 7, 6] },
+  mood: { title: 'Weekly mood trend', axis: 'MOOD SCORE', unit: '/10', values: [5.4, 6.1, 5.8, 7.3, 6.8, 7.6, 6.8], min: 4, max: 10, ticks: [10, 8, 6, 4] },
+};
 
 type ScheduleItem = {
   time: string;
@@ -18,6 +44,7 @@ type Task = {
   title: string;
   meta: string;
   done: boolean;
+  rewarded?: boolean;
 };
 
 const schedule: ScheduleItem[] = [
@@ -47,31 +74,90 @@ const moodCopy: Record<number, { label: string; tip: string }> = {
   10: { label: 'Overloaded', tip: 'Clear the evening plan and choose rest first.' },
 };
 
+const formatHeaderDate = (date: Date) => (
+  date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })
+);
+
+const formatMonth = (date: Date) => (
+  date.toLocaleDateString('en-US', { month: 'long' })
+);
+
+const isSameDate = (first: Date, second: Date) => first.toDateString() === second.toDateString();
+
+const getWeekDays = (date: Date) => {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
+
+  return Array.from({ length: 5 }).map((_, index) => {
+    const day = new Date(start);
+    day.setDate(start.getDate() + index);
+
+    return {
+      key: day.toISOString(),
+      label: day.toLocaleDateString('en-US', { weekday: 'short' }),
+      date: day.getDate().toString(),
+      fullDate: day,
+      isToday: isSameDate(day, date),
+    };
+  });
+};
+
 export default function BalanceHomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [today, setToday] = useState(() => new Date());
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(() => new Date());
+  const [nextFocusDone, setNextFocusDone] = useState(false);
   const [page, setPage] = useState<Page>('home');
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const [rewardProgress, setRewardProgress] = useState<RewardProgress>(() => loadRewardProgress());
   const [editingTaskIndex, setEditingTaskIndex] = useState<number | null>(null);
   const [mood, setMood] = useState(5);
   const [sleeping, setSleeping] = useState(false);
   const [handoffOpen, setHandoffOpen] = useState(false);
+  const [selectedGraph, setSelectedGraph] = useState<GraphMetric | null>(null);
+  const [redeemMessage, setRedeemMessage] = useState('');
   const openTasks = tasks.filter((task) => !task.done).length;
   const moodState = moodCopy[mood];
+  const headerDate = formatHeaderDate(today).toUpperCase();
+  const weekDays = getWeekDays(today);
+  const selectedCalendarLabel = selectedCalendarDate.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
+  const nextFocusProgress = nextFocusDone ? 100 : 45;
+  const activeGraph = selectedGraph ? weeklyGraphs[selectedGraph] : null;
+
+  useEffect(() => {
+    const updateToday = () => setToday(new Date());
+    const timer = setInterval(updateToday, 60 * 1000);
+    setRewardProgress(loadRewardProgress());
+
+    return () => clearInterval(timer);
+  }, []);
 
   const toggleTask = (index: number) => {
     if (editingTaskIndex === index) {
       return;
     }
 
-    setTasks((current) => current.map((task, taskIndex) => taskIndex === index ? { ...task, done: !task.done } : task));
+    const task = tasks[index];
+    const shouldAward = task && !task.done && !task.rewarded;
+
+    if (shouldAward) {
+      setRewardProgress(awardTaskReward(rewardProgress));
+    }
+
+    setTasks((current) => current.map((currentTask, taskIndex) => taskIndex === index ? {
+      ...currentTask,
+      done: !currentTask.done,
+      rewarded: currentTask.rewarded || shouldAward,
+    } : currentTask));
   };
 
   const addTask = () => {
-    setTasks((current) => [{ title: 'New focus block', meta: 'Today, 25 min', done: false }, ...current]);
+    setTasks((current) => [{ title: 'New focus block', meta: 'Today, 25 min', done: false, rewarded: false }, ...current]);
     setEditingTaskIndex(0);
     setPage('tasks');
   };
@@ -84,8 +170,47 @@ export default function BalanceHomeScreen() {
     setEditingTaskIndex(null);
   };
 
+  const deleteTask = (index: number) => {
+    setTasks((current) => current.filter((_, taskIndex) => taskIndex !== index));
+    setEditingTaskIndex((current) => {
+      if (current === null) {
+        return null;
+      }
+
+      if (current === index) {
+        return null;
+      }
+
+      return current > index ? current - 1 : current;
+    });
+  };
+
   const planTomorrow = () => {
-    setTasks((current) => [{ title: 'Lab report review', meta: 'Tomorrow, 25 min', done: false }, ...current]);
+    setTasks((current) => [{ title: 'Lab report review', meta: 'Tomorrow, 25 min', done: false, rewarded: false }, ...current]);
+  };
+
+  const redeemPoints = (rewardId: string) => {
+    const reward = REDEEM_REWARDS.find((item) => item.id === rewardId);
+
+    if (!reward) {
+      return;
+    }
+
+    if (rewardProgress.totalHealth < reward.cost) {
+      setRedeemMessage(`Earn ${reward.cost - rewardProgress.totalHealth} more HP to redeem ${reward.title}.`);
+      return;
+    }
+
+    setRewardProgress((currentProgress) => redeemReward(rewardId, currentProgress));
+    setRedeemMessage(`${reward.title} redeemed.`);
+  };
+
+  const openCalendar = () => {
+    const currentDate = new Date();
+    setToday(currentDate);
+    setSelectedCalendarDate(currentDate);
+    setNextFocusDone(false);
+    setPage('calendar');
   };
 
   if (!isSignedIn) {
@@ -102,7 +227,7 @@ export default function BalanceHomeScreen() {
               <Text style={styles.signInMarkText}>Zz</Text>
             </View>
             <Text selectable style={styles.signInTitle}>Balance</Text>
-            <Text selectable style={styles.signInCopy}>Sign in to lock in your schedule, mood, and flight mode.</Text>
+            <Text selectable style={styles.signInCopy}>Sign in to lock in your schedule, mood, and reward progress.</Text>
           </View>
 
           <View style={styles.signInCard}>
@@ -151,7 +276,7 @@ export default function BalanceHomeScreen() {
         contentContainerStyle={[styles.content, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 120 }]}>
         <View style={styles.topbar}>
           <View style={styles.topbarText}>
-            <Text selectable style={styles.kicker}>Thursday, Jul 2</Text>
+            <Text selectable style={styles.kicker}>{headerDate}</Text>
             <Text selectable style={styles.title}>Good morning, Ren</Text>
           </View>
           <Pressable accessibilityRole="button" accessibilityLabel="Start sleep session" onPress={() => setSleeping(true)} style={styles.sleepButton}>
@@ -207,16 +332,47 @@ export default function BalanceHomeScreen() {
 
         {page === 'calendar' ? (
           <View>
-            <SectionTitle title="Calendar" meta="July" />
+            <SectionTitle title="Calendar" meta={formatMonth(today)} />
             <View style={styles.weekStrip}>
-              {['Mon 29', 'Tue 30', 'Wed 1', 'Thu 2', 'Fri 3'].map((day) => (
-                <Pressable key={day} style={[styles.weekDay, day === 'Wed 1' && styles.selectedWeekDay]}>
-                  <Text style={[styles.weekDayText, day === 'Wed 1' && styles.selectedWeekDayText]}>{day.split(' ')[0]}</Text>
-                  <Text style={[styles.weekDateText, day === 'Wed 1' && styles.selectedWeekDayText]}>{day.split(' ')[1]}</Text>
+              {weekDays.map((day) => (
+                <Pressable
+                  key={day.key}
+                  onPress={() => {
+                    setSelectedCalendarDate(day.fullDate);
+                    setNextFocusDone(false);
+                  }}
+                  style={[styles.weekDay, isSameDate(day.fullDate, selectedCalendarDate) && styles.selectedWeekDay]}>
+                  <Text style={[styles.weekDayText, isSameDate(day.fullDate, selectedCalendarDate) && styles.selectedWeekDayText]}>{day.label}</Text>
+                  <Text style={[styles.weekDateText, isSameDate(day.fullDate, selectedCalendarDate) && styles.selectedWeekDayText]}>{day.date}</Text>
                 </Pressable>
               ))}
             </View>
-            <View style={styles.panel}><View style={styles.panelHead}><View><Text style={styles.kicker}>Next focus</Text><Text style={styles.panelTitle}>Calculus review</Text></View><Text style={styles.panelStrong}>09:00</Text></View><Text style={styles.muted}>Problem set, lecture notes, and quiz corrections.</Text></View>
+            <View style={styles.panel}>
+              <View style={styles.panelHead}>
+                <View>
+                  <Text selectable style={styles.kicker}>Next focus</Text>
+                  <Text selectable style={styles.panelTitle}>Calculus review</Text>
+                </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={nextFocusDone ? 'Mark next focus incomplete' : 'Mark next focus complete'}
+                  onPress={() => setNextFocusDone((current) => !current)}
+                  style={[styles.focusDoneButton, nextFocusDone && styles.focusDoneButtonActive]}>
+                  <Text style={[styles.focusDoneText, nextFocusDone && styles.focusDoneTextActive]}>✓</Text>
+                </Pressable>
+              </View>
+              <View style={styles.nextFocusBody}>
+                <Text selectable style={styles.muted}>{selectedCalendarLabel}</Text>
+                <Text selectable style={styles.muted}>09:00 - Problem set, lecture notes, and quiz corrections.</Text>
+                <View style={styles.focusProgressHeader}>
+                  <Text selectable style={styles.progressLabel}>{nextFocusDone ? 'Completed' : 'In progress'}</Text>
+                  <Text selectable style={styles.progressLabel}>{nextFocusProgress}%</Text>
+                </View>
+                <View style={styles.focusProgressTrack}>
+                  <View style={[styles.focusProgressFill, { width: `${nextFocusProgress}%` }]} />
+                </View>
+              </View>
+            </View>
             <ScheduleCard title="English Lit" subtitle="17:00, Room 105" color="orange" />
             <ScheduleCard title="Biology 101" subtitle="13:00, Lab 3" color="green" />
           </View>
@@ -225,6 +381,13 @@ export default function BalanceHomeScreen() {
         {page === 'tasks' ? (
           <View>
             <SectionTitle title="Tasks" meta={openTasks + ' open'} />
+            <View style={styles.taskRewardBanner}>
+              <View>
+                <Text selectable style={styles.kicker}>Lumi-style rewards</Text>
+                <Text selectable style={styles.taskRewardTitle}>{rewardProgress.totalHealth.toLocaleString()} HP earned</Text>
+              </View>
+              <Text selectable style={styles.taskRewardPill}>+{TASK_HEALTH_REWARD} HP/task</Text>
+            </View>
             <View style={styles.timeline}>
               {tasks.map((task, index) => (
                 editingTaskIndex === index ? (
@@ -247,10 +410,18 @@ export default function BalanceHomeScreen() {
                     <Pressable onPress={saveTask} style={styles.saveTaskButton}>
                       <Text style={styles.saveTaskText}>Save</Text>
                     </Pressable>
+                    <Pressable onPress={() => deleteTask(index)} style={styles.deleteTaskWideButton}>
+                      <Text style={styles.deleteTaskWideText}>Delete</Text>
+                    </Pressable>
                   </View>
                 ) : (
-                  <Pressable key={task.title + index} onPress={() => toggleTask(index)} style={[styles.taskRow, task.done && styles.taskDone]}>
-                    <View style={[styles.checkbox, task.done && styles.checkboxDone]} />
+                  <View key={task.title + index} style={[styles.taskRow, task.done && styles.taskDone]}>
+                    <Pressable
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked: task.done }}
+                      onPress={() => toggleTask(index)}
+                      style={[styles.checkbox, task.done && styles.checkboxDone]}
+                    />
                     <View style={styles.taskTextBlock}>
                       <Text selectable style={styles.taskTitle}>{task.title}</Text>
                       <Text selectable style={styles.muted}>{task.meta}</Text>
@@ -258,7 +429,10 @@ export default function BalanceHomeScreen() {
                     <Pressable onPress={() => setEditingTaskIndex(index)} style={styles.editTaskButton}>
                       <Text style={styles.editTaskText}>Edit</Text>
                     </Pressable>
-                  </Pressable>
+                    <Pressable onPress={() => deleteTask(index)} style={styles.deleteTaskButton}>
+                      <Text style={styles.deleteTaskText}>Delete</Text>
+                    </Pressable>
+                  </View>
                 )
               ))}
             </View>
@@ -267,12 +441,72 @@ export default function BalanceHomeScreen() {
 
         {page === 'analytics' ? (
           <View>
-            <SectionTitle title="Analytics" meta="This week" />
+            <SectionTitle title="Stats" meta="This week" />
+            <View style={styles.statsRewardPanel}>
+              <View style={styles.panelHead}>
+                <View>
+                  <Text selectable style={styles.kicker}>Completed tasks</Text>
+                  <Text selectable style={styles.panelTitle}>{rewardProgress.completedTasks} tasks finished</Text>
+                </View>
+                <View style={styles.statsHpBadge}>
+                  <Text selectable style={styles.statsHpText}>{rewardProgress.totalHealth.toLocaleString()} HP</Text>
+                </View>
+              </View>
+              <View style={styles.statsRewardGrid}>
+                <View style={styles.statsMiniCard}>
+                  <Text selectable style={styles.metricLabel}>Points earned</Text>
+                  <Text selectable style={styles.metricValue}>{rewardProgress.totalHealth.toLocaleString()}</Text>
+                </View>
+                <View style={styles.statsMiniCard}>
+                  <Text selectable style={styles.metricLabel}>Coins</Text>
+                  <Text selectable style={styles.metricValue}>{rewardProgress.coins.toLocaleString()}</Text>
+                </View>
+                <View style={styles.statsMiniCard}>
+                  <Text selectable style={styles.metricLabel}>Redeemed</Text>
+                  <Text selectable style={styles.metricValue}>{rewardProgress.redeemedRewards}</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.redeemPanel}>
+              <View style={styles.panelHead}>
+                <View>
+                  <Text selectable style={styles.kicker}>Rewards shop</Text>
+                  <Text selectable style={styles.panelTitle}>Redeem points</Text>
+                </View>
+                <Text selectable style={styles.availablePoints}>{rewardProgress.totalHealth.toLocaleString()} HP available</Text>
+              </View>
+              <View style={styles.redeemList}>
+                {REDEEM_REWARDS.map((reward) => {
+                  const canRedeem = rewardProgress.totalHealth >= reward.cost;
+
+                  return (
+                    <View key={reward.id} style={styles.redeemRow}>
+                      <View style={styles.redeemTextBlock}>
+                        <Text selectable style={styles.redeemTitle}>{reward.title}</Text>
+                        <Text selectable style={styles.muted}>{reward.detail}</Text>
+                      </View>
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={!canRedeem}
+                        onPress={() => redeemPoints(reward.id)}
+                        style={[styles.redeemButton, !canRedeem && styles.redeemButtonDisabled]}>
+                        <Text style={[styles.redeemButtonText, !canRedeem && styles.redeemButtonTextDisabled]}>
+                          {canRedeem ? `${reward.cost} HP` : 'Locked'}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  );
+                })}
+              </View>
+              {redeemMessage ? <Text selectable style={styles.redeemMessage}>{redeemMessage}</Text> : null}
+            </View>
+
             <View style={styles.metricGrid}>
-              <Metric label="Focus" value="12.5h" />
-              <Metric label="Tasks" value="86%" />
-              <Metric label="Sleep" value="7.1h" />
-              <Metric label="Mood" value="6.8" />
+              <Metric label="Focus" value="12.5h" onPress={() => setSelectedGraph('focus')} />
+              <Metric label="Tasks" value={rewardProgress.completedTasks.toString()} onPress={() => setSelectedGraph('tasks')} />
+              <Metric label="Sleep" value="7.1h" onPress={() => setSelectedGraph('sleep')} />
+              <Metric label="Mood" value="6.8" onPress={() => setSelectedGraph('mood')} />
             </View>
             <View style={styles.panel}><Text style={styles.kicker}>Pattern</Text><Text style={styles.panelTitle}>Better mornings</Text><Text style={styles.muted}>Focus blocks before lunch are completed most often.</Text></View>
           </View>
@@ -281,7 +515,7 @@ export default function BalanceHomeScreen() {
 
       <View style={styles.bottomNav}>
         <NavButton label="Home" active={page === 'home'} onPress={() => setPage('home')} />
-        <NavButton label="Calendar" active={page === 'calendar'} onPress={() => setPage('calendar')} />
+        <NavButton label="Calendar" active={page === 'calendar'} onPress={openCalendar} />
         <Pressable onPress={addTask} style={styles.addButton}><Text style={styles.addText}>+</Text></Pressable>
         <NavButton label="Tasks" active={page === 'tasks'} onPress={() => setPage('tasks')} />
         <NavButton label="Stats" active={page === 'analytics'} onPress={() => setPage('analytics')} />
@@ -305,13 +539,35 @@ export default function BalanceHomeScreen() {
           <View style={styles.sleepModal}>
             <View style={styles.sleepMoon}><Text style={styles.sleepButtonText}>Zz</Text></View>
             <Text selectable style={styles.sleepTitle}>Mood Locked</Text>
-            <Text selectable style={styles.muted}>Your balance page is paused. Continue into flight mode when you are ready.</Text>
+            <Text selectable style={styles.muted}>Your balance page is paused. Continue into reward mode when you are ready.</Text>
             <Pressable onPress={() => router.push('/flight')} style={styles.endSleepButton}>
               <Text style={styles.endSleepText}>Continue</Text>
             </Pressable>
             <Pressable onPress={() => setHandoffOpen(false)} style={styles.secondaryAction}>
               <Text style={styles.secondaryText}>Stay Here</Text>
             </Pressable>
+          </View>
+        </View>
+      ) : null}
+
+      {activeGraph ? (
+        <View style={styles.sleepOverlay}>
+          <View style={styles.focusGraphModal}>
+            <View style={styles.graphHeader}>
+              <View>
+                <Text selectable style={styles.kicker}>Weekly trend</Text>
+                <Text selectable style={styles.sleepTitle}>{activeGraph.title}</Text>
+              </View>
+              <Pressable accessibilityRole="button" accessibilityLabel="Close weekly trend graph" onPress={() => setSelectedGraph(null)} style={styles.closeGraphButton}>
+                <Text style={styles.closeGraphText}>×</Text>
+              </Pressable>
+            </View>
+            <View style={styles.trendCallout}><Text selectable style={styles.trendArrow}>↗</Text><Text selectable style={styles.trendCopy}>Weekly sample pattern</Text></View>
+            <WeeklyTrendChart graph={activeGraph} />
+            <View style={styles.focusGraphSummary}>
+              <View><Text selectable style={styles.metricLabel}>Weekly total</Text><Text selectable style={styles.graphSummaryValue}>{activeGraph.values.reduce((total, value) => total + value, 0).toFixed(1)}{activeGraph.unit}</Text></View>
+              <View><Text selectable style={styles.metricLabel}>Daily average</Text><Text selectable style={styles.graphSummaryValue}>{(activeGraph.values.reduce((total, value) => total + value, 0) / activeGraph.values.length).toFixed(1)}{activeGraph.unit}</Text></View>
+            </View>
           </View>
         </View>
       ) : null}
@@ -339,8 +595,42 @@ function MoodPanel({ mood, setMood, moodState, onLock }: { mood: number; setMood
   return <View style={[styles.panel, styles.moodPanel]}><View style={styles.panelHead}><View><Text style={styles.kicker}>Stress and mood</Text><Text selectable style={styles.panelTitle}>{moodState.label}</Text></View><Text selectable style={styles.panelStrong}>{mood}/10</Text></View><View style={styles.faces}><Text>:)</Text><Text>:|</Text><Text>:/</Text><Text>:(</Text></View><View style={styles.moodSteps}>{Array.from({ length: 10 }).map((_, index) => <Pressable key={index} onPress={() => setMood(index + 1)} style={[styles.moodStep, mood >= index + 1 && styles.moodStepActive]} />)}</View><View style={styles.tipBox}><Text style={styles.tipTitle}>Wellness tip</Text><Text selectable style={styles.tipCopy}>{moodState.tip}</Text></View><Pressable onPress={onLock} style={styles.primaryAction}><Text style={styles.primaryText}>Lock Mood</Text></Pressable></View>;
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
-  return <View style={styles.metric}><Text style={styles.metricLabel}>{label}</Text><Text selectable style={styles.metricValue}>{value}</Text></View>;
+function Metric({ label, value, onPress }: { label: string; value: string; onPress?: () => void }) {
+  const content = <><Text style={styles.metricLabel}>{label}</Text><Text selectable style={styles.metricValue}>{value}</Text>{onPress ? <Text style={styles.metricHint}>View week</Text> : null}</>;
+  return onPress ? <Pressable accessibilityRole="button" accessibilityLabel={`View weekly ${label.toLowerCase()} graph`} onPress={onPress} style={[styles.metric, styles.metricButton]}>{content}</Pressable> : <View style={styles.metric}>{content}</View>;
+}
+
+function WeeklyTrendChart({ graph }: { graph: WeeklyGraphConfig }) {
+  const { values, min, max, ticks, unit, axis } = graph;
+  const labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const [plotWidth, setPlotWidth] = useState(0);
+  const chartHeight = 190;
+  const points = values.map((value, index) => ({
+    value,
+    label: labels[index],
+    x: plotWidth * index / (values.length - 1),
+    y: chartHeight - ((value - min) / (max - min)) * chartHeight,
+  }));
+  const segments = points.slice(0, -1).map((point, index) => {
+    const next = points[index + 1];
+    const deltaX = next.x - point.x;
+    const deltaY = next.y - point.y;
+
+    return { left: point.x, top: point.y, width: Math.hypot(deltaX, deltaY), rotate: `${Math.atan2(deltaY, deltaX) * 180 / Math.PI}deg` };
+  });
+
+  return <View style={styles.classicGraph}>
+    <Text selectable style={styles.axisTitle}>{axis}</Text>
+    <View style={styles.graphBody}>
+      <View style={styles.graphScale}>{ticks.map((tick) => <Text key={tick} selectable style={styles.graphScaleText}>{tick}{unit}</Text>)}</View>
+      <View onLayout={(event) => setPlotWidth(event.nativeEvent.layout.width)} style={styles.graphPlot}>
+        {ticks.map((_, index) => <View key={index} style={[styles.graphGridLine, { top: `${(index / (ticks.length - 1)) * 100}%` }]} />)}
+        {plotWidth > 0 ? segments.map((segment, index) => <View key={index} style={[styles.graphLine, { left: segment.left, top: segment.top, transform: [{ rotate: segment.rotate }], width: segment.width }]} />) : null}
+        {plotWidth > 0 ? points.map((point) => <View key={point.label} style={[styles.graphPointColumn, { left: point.x, top: point.y }]}><Text selectable style={styles.graphValue}>{point.value}{unit}</Text><View style={styles.graphPoint} /><Text selectable style={styles.graphDay}>{point.label}</Text></View>) : null}
+      </View>
+    </View>
+    <Text selectable style={styles.xAxisTitle}>DAYS</Text>
+  </View>;
 }
 
 function NavButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
@@ -374,6 +664,15 @@ const styles = StyleSheet.create({
   panelHead: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   panelTitle: { color: '#152033', fontSize: 21, fontWeight: '900' },
   panelStrong: { color: '#152033', fontSize: 20, fontWeight: '900' },
+  nextFocusBody: { gap: 10, marginTop: 14 },
+  focusDoneButton: { alignItems: 'center', backgroundColor: '#eef4f7', borderColor: '#dbe4ef', borderRadius: 8, borderWidth: 1, height: 44, justifyContent: 'center', width: 44 },
+  focusDoneButtonActive: { backgroundColor: '#45a86e', borderColor: '#45a86e' },
+  focusDoneText: { color: '#768399', fontSize: 22, fontWeight: '900', lineHeight: 24 },
+  focusDoneTextActive: { color: '#ffffff' },
+  focusProgressHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 },
+  progressLabel: { color: '#657189', fontSize: 13, fontWeight: '900' },
+  focusProgressTrack: { backgroundColor: '#e4e9f1', borderRadius: 8, height: 10, overflow: 'hidden' },
+  focusProgressFill: { backgroundColor: '#6753dd', borderRadius: 8, height: '100%' },
   score: { alignItems: 'center', backgroundColor: '#45a86e', borderRadius: 8, height: 52, justifyContent: 'center', width: 52 },
   scoreText: { color: '#ffffff', fontSize: 22, fontWeight: '900' },
   sleepTotal: { gap: 4, marginBottom: 14, marginTop: 20 },
@@ -426,6 +725,9 @@ const styles = StyleSheet.create({
   weekDayText: { color: '#768399', fontSize: 13, fontWeight: '900' },
   weekDateText: { color: '#152033', fontSize: 18, fontWeight: '900', marginTop: 6 },
   selectedWeekDayText: { color: '#ffffff' },
+  taskRewardBanner: { alignItems: 'center', backgroundColor: '#ffffff', borderColor: '#e4e9f1', borderRadius: 8, borderWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12, padding: 14, boxShadow: '0 14px 34px rgba(40,55,85,0.12)' },
+  taskRewardTitle: { color: '#152033', fontSize: 18, fontWeight: '900' },
+  taskRewardPill: { backgroundColor: '#f0edff', borderRadius: 999, color: '#6753dd', fontSize: 13, fontVariant: ['tabular-nums'], fontWeight: '900', overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 7 },
   taskRow: { alignItems: 'center', backgroundColor: '#ffffff', borderColor: '#e4e9f1', borderRadius: 8, borderWidth: 1, flexDirection: 'row', gap: 12, padding: 14 },
   taskDone: { opacity: 0.55 },
   checkbox: { borderColor: '#768399', borderRadius: 5, borderWidth: 2, height: 20, width: 20 },
@@ -439,10 +741,32 @@ const styles = StyleSheet.create({
   saveTaskText: { color: '#ffffff', fontSize: 14, fontWeight: '900' },
   editTaskButton: { alignItems: 'center', borderColor: '#e4e9f1', borderRadius: 8, borderWidth: 1, minHeight: 38, justifyContent: 'center', paddingHorizontal: 12 },
   editTaskText: { color: '#657189', fontSize: 13, fontWeight: '900' },
+  deleteTaskButton: { alignItems: 'center', borderColor: '#ffd8df', borderRadius: 8, borderWidth: 1, minHeight: 38, justifyContent: 'center', paddingHorizontal: 12 },
+  deleteTaskText: { color: '#df6689', fontSize: 13, fontWeight: '900' },
+  deleteTaskWideButton: { alignItems: 'center', alignSelf: 'flex-start', borderColor: '#ffd8df', borderRadius: 8, borderWidth: 1, minHeight: 42, justifyContent: 'center', paddingHorizontal: 18 },
+  deleteTaskWideText: { color: '#df6689', fontSize: 14, fontWeight: '900' },
+  statsRewardPanel: { backgroundColor: '#ffffff', borderColor: '#e4e9f1', borderRadius: 8, borderWidth: 1, gap: 14, marginBottom: 14, padding: 18, boxShadow: '0 14px 34px rgba(40,55,85,0.12)' },
+  statsHpBadge: { alignItems: 'center', backgroundColor: '#152033', borderRadius: 8, minHeight: 44, justifyContent: 'center', paddingHorizontal: 14 },
+  statsHpText: { color: '#ffffff', fontSize: 15, fontVariant: ['tabular-nums'], fontWeight: '900' },
+  statsRewardGrid: { flexDirection: 'row', gap: 10 },
+  statsMiniCard: { backgroundColor: '#eef4f7', borderColor: '#dbe4ef', borderRadius: 8, borderWidth: 1, flex: 1, gap: 6, padding: 12 },
+  redeemPanel: { backgroundColor: '#ffffff', borderColor: '#e4e9f1', borderRadius: 8, borderWidth: 1, gap: 14, marginBottom: 14, padding: 18, boxShadow: '0 14px 34px rgba(40,55,85,0.12)' },
+  availablePoints: { backgroundColor: '#f0edff', borderRadius: 999, color: '#6753dd', fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '900', overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 7 },
+  redeemList: { gap: 10 },
+  redeemRow: { alignItems: 'center', backgroundColor: '#f8fafc', borderColor: '#e4e9f1', borderRadius: 8, borderWidth: 1, flexDirection: 'row', gap: 12, padding: 12 },
+  redeemTextBlock: { flex: 1 },
+  redeemTitle: { color: '#152033', fontSize: 16, fontWeight: '900', marginBottom: 4 },
+  redeemButton: { alignItems: 'center', backgroundColor: '#6753dd', borderRadius: 8, minHeight: 42, justifyContent: 'center', minWidth: 82, paddingHorizontal: 12 },
+  redeemButtonDisabled: { backgroundColor: '#e4e9f1' },
+  redeemButtonText: { color: '#ffffff', fontSize: 13, fontVariant: ['tabular-nums'], fontWeight: '900' },
+  redeemButtonTextDisabled: { color: '#768399' },
+  redeemMessage: { color: '#45a86e', fontSize: 14, fontWeight: '900' },
   metricGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: 14 },
   metric: { backgroundColor: '#ffffff', borderColor: '#e4e9f1', borderRadius: 8, borderWidth: 1, padding: 18, width: '48%' },
+  metricButton: { alignItems: 'flex-start' },
   metricLabel: { color: '#768399', fontWeight: '800' },
   metricValue: { color: '#152033', fontSize: 28, fontWeight: '900', marginTop: 8 },
+  metricHint: { color: '#6753dd', fontSize: 12, fontWeight: '900', marginTop: 8 },
   bottomNav: { alignItems: 'center', alignSelf: 'center', backgroundColor: 'rgba(255,255,255,0.92)', borderColor: 'rgba(228,233,241,0.82)', borderRadius: 8, borderWidth: 1, bottom: 12, flexDirection: 'row', gap: 4, height: 74, justifyContent: 'space-between', padding: 8, position: 'absolute', width: '94%', boxShadow: '0 14px 40px rgba(34,47,71,0.18)' },
   navButton: { alignItems: 'center', borderRadius: 8, flex: 1, height: 48, justifyContent: 'center' },
   activeNavButton: { backgroundColor: '#6753dd' },
@@ -458,4 +782,26 @@ const styles = StyleSheet.create({
   endSleepText: { color: '#ffffff', fontWeight: '900' },
   secondaryAction: { alignItems: 'center', borderColor: '#e4e9f1', borderRadius: 8, borderWidth: 1, minHeight: 44, justifyContent: 'center', marginTop: 10, width: '100%' },
   secondaryText: { color: '#152033', fontWeight: '900' },
+  focusGraphModal: { backgroundColor: '#ffffff', borderRadius: 8, gap: 10, padding: 22, width: '88%' },
+  graphHeader: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
+  closeGraphButton: { alignItems: 'center', backgroundColor: '#eef4f7', borderRadius: 18, height: 36, justifyContent: 'center', width: 36 },
+  closeGraphText: { color: '#152033', fontSize: 27, fontWeight: '500', lineHeight: 30 },
+  classicGraph: { alignItems: 'center', gap: 8, marginTop: 16 },
+  axisTitle: { color: '#657189', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
+  graphBody: { alignSelf: 'stretch', flexDirection: 'row', gap: 8, height: 222 },
+  graphScale: { height: 190, justifyContent: 'space-between', paddingBottom: 1, width: 25 },
+  graphScaleText: { color: '#657189', fontSize: 10, fontVariant: ['tabular-nums'], fontWeight: '900', textAlign: 'right' },
+  graphPlot: { flex: 1, height: 190, position: 'relative' },
+  graphGridLine: { backgroundColor: '#cbd5e1', height: 1.5, left: 0, position: 'absolute', right: 0 },
+  graphLine: { backgroundColor: '#3378d8', height: 4, position: 'absolute', transformOrigin: 'left center' },
+  graphPointColumn: { alignItems: 'center', marginLeft: -18, marginTop: -8, position: 'absolute', width: 36 },
+  graphPoint: { backgroundColor: '#3378d8', borderColor: '#ffffff', borderRadius: 8, borderWidth: 2, height: 13, marginTop: 2, width: 13 },
+  graphValue: { color: '#152033', fontSize: 10, fontVariant: ['tabular-nums'], fontWeight: '900', marginBottom: 1 },
+  graphDay: { color: '#657189', fontSize: 10, fontWeight: '900', marginTop: 184, position: 'absolute' },
+  xAxisTitle: { color: '#657189', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
+  focusGraphSummary: { backgroundColor: '#f4f0ff', borderRadius: 8, flexDirection: 'row', justifyContent: 'space-between', marginTop: 2, padding: 14 },
+  graphSummaryValue: { color: '#152033', fontSize: 18, fontVariant: ['tabular-nums'], fontWeight: '900', marginTop: 4 },
+  trendCallout: { alignItems: 'center', flexDirection: 'row', gap: 7 },
+  trendArrow: { color: '#45a86e', fontSize: 19, fontWeight: '900' },
+  trendCopy: { color: '#45a86e', fontSize: 13, fontWeight: '900' },
 });

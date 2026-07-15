@@ -1,34 +1,67 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { loadRewardProgress, RewardProgress, TASK_HEALTH_REWARD } from '@/constants/rewards';
 
-type City = {
-  code: string;
-  name: string;
-  time: string;
-  distance: string;
+type RewardStop = {
+  id: string;
+  title: string;
+  detail: string;
+  hp: number;
+  coin: number;
   top: number;
   left: number;
 };
 
-const cities: City[] = [
-  { code: 'YXC', name: 'Cranbrook', time: '2h 3m', distance: '901 mi', top: 248, left: 106 },
-  { code: 'ABQ', name: 'Albuquerque', time: '2h 3m', distance: '896 mi', top: 322, left: 286 },
-  { code: 'ALS', name: 'Alamosa', time: '2h 4m', distance: '843 mi', top: 276, left: 340 },
-  { code: 'COD', name: 'Cody', time: '1h 57m', distance: '738 mi', top: 210, left: 318 },
-  { code: 'BIL', name: 'Billings', time: '2h 0m', distance: '809 mi', top: 182, left: 328 },
-  { code: 'SVC', name: 'Silver City', time: '2h 8m', distance: '942 mi', top: 392, left: 350 },
-  { code: 'HMO', name: 'Hermosillo', time: '2h 12m', distance: '955 mi', top: 474, left: 322 },
+const rewardStops: RewardStop[] = [
+  { id: 'task1', title: 'First task complete', detail: 'Finish any task in the Tasks tab.', hp: 120, coin: 18, top: 304, left: 70 },
+  { id: 'task2', title: 'Build momentum', detail: 'Complete two focus blocks today.', hp: 240, coin: 36, top: 232, left: 226 },
+  { id: 'task3', title: 'Quest checkpoint', detail: 'Three completed tasks unlock the next guide.', hp: 360, coin: 54, top: 164, left: 108 },
+  { id: 'task4', title: 'Evening streak', detail: 'Keep the streak going before wind down.', hp: 480, coin: 72, top: 94, left: 254 },
+  { id: 'task5', title: 'Chapter clear', detail: 'Reach the weekly HP goal.', hp: 560, coin: 90, top: 26, left: 142 },
 ];
 
-export default function FlightPickerScreen() {
+const energy = 4;
+const selectedWeek = 1;
+
+export default function RewardMapScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const [selectedCity, setSelectedCity] = useState<City>(cities[1]);
-  const screenWidth = Math.min(width - 32, 430);
+  const [rewardProgress, setRewardProgress] = useState<RewardProgress>(() => loadRewardProgress());
+  const [selectedStop, setSelectedStop] = useState<RewardStop>(rewardStops[1]);
+
+  const chapterLeft = Math.max(0, rewardProgress.chapterGoal - rewardProgress.totalHealth);
+  const progressPercent = useMemo(
+    () => Math.min(100, Math.round((rewardProgress.totalHealth / rewardProgress.chapterGoal) * 100)),
+    [rewardProgress.chapterGoal, rewardProgress.totalHealth],
+  );
+
+  useEffect(() => {
+    const refreshProgress = () => setRewardProgress(loadRewardProgress());
+    refreshProgress();
+
+    if (typeof window === 'undefined') {
+      return undefined;
+    }
+
+    window.addEventListener('focus', refreshProgress);
+
+    return () => window.removeEventListener('focus', refreshProgress);
+  }, []);
+
+  const startChallenge = () => {
+    router.push({
+      pathname: '/seat',
+      params: {
+        cityCode: 'REST',
+        cityName: 'Sleep Quest',
+        duration: '25 min',
+        distance: `${selectedStop.hp} HP`,
+      },
+    });
+  };
 
   return (
     <View style={styles.root}>
@@ -39,118 +72,153 @@ export default function FlightPickerScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: Math.max(insets.top + 14, 34), paddingBottom: insets.bottom + 24 },
+          { paddingTop: Math.max(insets.top + 12, 30), paddingBottom: insets.bottom + 28 },
         ]}>
-        <View style={[styles.phoneFrame, { width: screenWidth }]}> 
-          <View style={styles.mapGrid}>
-            {Array.from({ length: 9 }).map((_, index) => (
-              <View key={'v' + index} style={[styles.gridLineVertical, { left: index * 54 - 28 }]} />
-            ))}
-            {Array.from({ length: 13 }).map((_, index) => (
-              <View key={'h' + index} style={[styles.gridLineHorizontal, { top: index * 58 - 20 }]} />
-            ))}
-          </View>
+        <View style={styles.phoneFrame}>
+          <View pointerEvents="none" style={styles.skyBeamOne} />
+          <View pointerEvents="none" style={styles.skyBeamTwo} />
+          <View pointerEvents="none" style={styles.moon} />
 
-          <View style={styles.topBar}>
-            <Text selectable style={styles.timeText}>2:49</Text>
-            <View style={styles.dynamicIsland} />
-            <Text selectable style={styles.batteryText}>10%</Text>
-          </View>
-
-          <View style={styles.actionRow}>
-            <Pressable style={styles.circleButton}>
-              <Text style={styles.backIcon}>{'<'}</Text>
+          <View style={styles.statusRow}>
+            <Pressable accessibilityRole="button" onPress={() => router.back()} style={styles.backButton}>
+              <Text style={styles.backText}>{'<'}</Text>
             </Pressable>
-            <View style={styles.rightActions}>
-              <Pressable style={styles.circleButton}>
-                <Text style={styles.alertIcon}>!</Text>
-              </Pressable>
-              <Pressable style={styles.circleButton}>
-                <Text style={styles.searchIcon}>⌕</Text>
-              </Pressable>
+            <View style={styles.chapterBadge}>
+              <Text selectable style={styles.chapterText}>
+                WEEK {selectedWeek}
+              </Text>
+            </View>
+            <View style={styles.coinBadge}>
+              <Text selectable style={styles.coinText}>
+                {rewardProgress.coins}
+              </Text>
             </View>
           </View>
 
-          <View style={styles.mapBody}>
-            <View style={styles.flightPath} />
-            <View style={styles.currentPin} />
-            <View style={styles.stateShape} />
-            {cities.map((city) => {
-              const isSelected = city.code === selectedCity.code;
-              return (
-                <Pressable
-                  key={city.code}
-                  onPress={() => setSelectedCity(city)}
-                  style={[
-                    styles.mapTag,
-                    { top: city.top, left: Math.min(city.left, screenWidth - 118) },
-                    isSelected && styles.selectedMapTag,
-                  ]}>
-                  <Text style={[styles.mapTagText, isSelected && styles.selectedMapTagText]}>
-                    {'✈ ' + city.code}
-                  </Text>
-                </Pressable>
-              );
-            })}
+          <View style={styles.questLabel}>
+            <Text selectable style={styles.questLabelText}>
+              Live Well With Better Sleep
+            </Text>
           </View>
 
-          <View style={styles.timelineWrap}>
-            <Text selectable style={styles.legalText}>Legal</Text>
-            <View style={styles.timelineTicks}>
-              {Array.from({ length: 31 }).map((_, index) => (
-                <View
-                  key={index}
-                  style={[styles.tick, index % 10 === 0 && styles.majorTick, index === 15 && styles.centerTick]}
-                />
+          <View style={styles.hpPanel}>
+            <View style={styles.hpHeader}>
+              <Text selectable style={styles.daysLeft}>
+                7 days left
+              </Text>
+              <Text selectable style={styles.energyText}>
+                {energy}/5 energy
+              </Text>
+            </View>
+            <View style={styles.progressCircleOuter}>
+              <View style={styles.progressCircleInner}>
+                <Text selectable style={styles.hpValue}>
+                  {rewardProgress.totalHealth.toLocaleString()}
+                </Text>
+                <Text selectable style={styles.hpUnit}>
+                  health points
+                </Text>
+              </View>
+            </View>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
+            </View>
+            <Text selectable style={styles.chapterLeft}>
+              Goal {rewardProgress.chapterGoal.toLocaleString()} HP - {chapterLeft.toLocaleString()} away
+            </Text>
+          </View>
+
+          <View style={styles.cityLayer}>
+            <View style={[styles.tower, styles.towerTall]} />
+            <View style={[styles.tower, styles.towerThin]} />
+            <View style={[styles.tower, styles.towerWide]} />
+            <View style={[styles.tower, styles.towerSmall]} />
+            <View style={styles.windowGrid}>
+              {Array.from({ length: 18 }).map((_, index) => (
+                <View key={index} style={styles.windowDot} />
               ))}
             </View>
-            <View style={styles.timeLabels}>
-              <Text selectable style={styles.timeLabel}>1h 50m</Text>
-              <Text selectable style={styles.timeLabel}>2h 0m</Text>
-              <Text selectable style={styles.timeLabel}>2h 10m</Text>
-            </View>
           </View>
 
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.cityCards}
-            style={styles.cityCardsScroll}>
-            {cities.map((city) => {
-              const isSelected = city.code === selectedCity.code;
+          <View style={styles.mapStage}>
+            <View pointerEvents="none" style={styles.pathSegmentTop} />
+            <View pointerEvents="none" style={styles.pathSegmentMid} />
+            <View pointerEvents="none" style={styles.pathSegmentLower} />
+            <View pointerEvents="none" style={styles.pathCurveOne} />
+            <View pointerEvents="none" style={styles.pathCurveTwo} />
+
+            {rewardStops.map((stop, index) => {
+              const isSelected = selectedStop.id === stop.id;
+              const isDone = rewardProgress.completedTasks > index;
+
               return (
                 <Pressable
-                  key={city.code}
-                  onPress={() => setSelectedCity(city)}
-                  style={[styles.cityCard, isSelected && styles.selectedCityCard]}>
-                  <View style={[styles.cityBadge, isSelected && styles.selectedCityBadge]}>
-                    <Text style={[styles.cityBadgeText, isSelected && styles.selectedCityBadgeText]}>
-                      {'✈ ' + city.code}
-                    </Text>
-                  </View>
-                  <Text selectable style={[styles.cityName, isSelected && styles.selectedCityName]}>
-                    {city.name}
-                  </Text>
-                  <Text selectable style={[styles.cityTime, isSelected && styles.selectedCityTime]}>
-                    {city.time}
+                  key={stop.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Select ${stop.title}`}
+                  onPress={() => setSelectedStop(stop)}
+                  style={[styles.rewardNode, { top: stop.top, left: stop.left }, isSelected && styles.rewardNodeActive]}>
+                  <Text selectable={false} style={[styles.rewardNodeText, isSelected && styles.rewardNodeTextActive]}>
+                    {isDone ? 'Done' : `+${TASK_HEALTH_REWARD}`}
                   </Text>
                 </Pressable>
               );
             })}
-          </ScrollView>
 
-          <Pressable
-            style={styles.bookButton}
-            onPress={() => router.push({
-              pathname: '/seat',
-              params: {
-                cityCode: selectedCity.code,
-                cityName: selectedCity.name,
-                duration: selectedCity.time,
-                distance: selectedCity.distance,
-              },
-            })}>
-            <Text style={styles.bookText}>Book My Flight</Text>
+            <View pointerEvents="none" style={styles.mascot}>
+              <View style={styles.mascotFace} />
+            </View>
+          </View>
+
+          <View style={styles.rewardCard}>
+            <View style={styles.rewardCardHeader}>
+              <View>
+                <Text selectable style={styles.kicker}>
+                  Quest guide
+                </Text>
+                <Text selectable style={styles.rewardTitle}>
+                  {selectedStop.title}
+                </Text>
+              </View>
+              <View style={styles.rewardPill}>
+              <Text selectable style={styles.rewardPillText}>
+                  +{TASK_HEALTH_REWARD} HP
+                </Text>
+              </View>
+            </View>
+            <Text selectable style={styles.rewardDetail}>
+              {selectedStop.detail}
+            </Text>
+            <View style={styles.rewardStats}>
+              <View style={styles.rewardStat}>
+                <Text selectable style={styles.statLabel}>
+                  Tasks
+                </Text>
+                <Text selectable style={styles.statValue}>
+                  {rewardProgress.completedTasks}
+                </Text>
+              </View>
+              <View style={styles.rewardStat}>
+                <Text selectable style={styles.statLabel}>
+                  Progress
+                </Text>
+                <Text selectable style={styles.statValue}>
+                  {progressPercent}%
+                </Text>
+              </View>
+              <View style={styles.rewardStat}>
+                <Text selectable style={styles.statLabel}>
+                  Streak
+                </Text>
+                <Text selectable style={styles.statValue}>
+                  3 days
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          <Pressable accessibilityRole="button" onPress={startChallenge} style={styles.startButton}>
+            <Text style={styles.startButtonText}>Start Sleep Quest</Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -161,287 +229,428 @@ export default function FlightPickerScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#090a18',
   },
   scrollContent: {
     alignItems: 'center',
     minHeight: '100%',
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
   },
   phoneFrame: {
-    backgroundColor: '#525256',
-    minHeight: 820,
+    backgroundColor: '#827bb3',
+    borderColor: '#17172b',
+    borderRadius: 24,
+    borderWidth: 1,
+    maxWidth: 430,
+    minHeight: 900,
     overflow: 'hidden',
     position: 'relative',
+    width: '100%',
   },
-  mapGrid: {
-    ...StyleSheet.absoluteFillObject,
-    opacity: 0.34,
-  },
-  gridLineVertical: {
-    backgroundColor: '#27272b',
-    height: 980,
-    position: 'absolute',
-    top: -80,
-    transform: [{ rotate: '10deg' }],
-    width: 1,
-  },
-  gridLineHorizontal: {
-    backgroundColor: '#29292d',
-    height: 1,
+  skyBeamOne: {
+    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    height: 520,
     left: -80,
     position: 'absolute',
-    transform: [{ rotate: '10deg' }],
-    width: 620,
-  },
-  topBar: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 34,
-    paddingTop: 20,
-  },
-  timeText: {
-    color: '#ffffff',
-    fontSize: 18,
-    fontWeight: '800',
-    fontVariant: ['tabular-nums'],
-  },
-  dynamicIsland: {
-    backgroundColor: '#000000',
-    borderRadius: 26,
-    height: 44,
-    width: 176,
-  },
-  batteryText: {
-    backgroundColor: '#2a2a2f',
-    borderRadius: 7,
-    color: '#eeeeee',
-    fontSize: 13,
-    fontWeight: '800',
-    overflow: 'hidden',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-  },
-  actionRow: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 28,
-    paddingTop: 42,
-    zIndex: 4,
-  },
-  rightActions: {
-    flexDirection: 'row',
-    gap: 16,
-  },
-  circleButton: {
-    alignItems: 'center',
-    backgroundColor: '#2b2b30',
-    borderRadius: 34,
-    height: 56,
-    justifyContent: 'center',
-    width: 56,
-  },
-  backIcon: {
-    color: '#ffffff',
-    fontSize: 35,
-    fontWeight: '300',
-    lineHeight: 40,
-  },
-  alertIcon: {
-    borderColor: '#ffffff',
-    borderRadius: 12,
-    borderWidth: 2,
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: '700',
-    height: 28,
-    lineHeight: 26,
-    textAlign: 'center',
-    width: 28,
-  },
-  searchIcon: {
-    color: '#ffffff',
-    fontSize: 40,
-    fontWeight: '300',
-    lineHeight: 42,
-    marginTop: -4,
-  },
-  mapBody: {
-    height: 530,
-    marginTop: 8,
-    position: 'relative',
-  },
-  stateShape: {
-    backgroundColor: '#17171b',
-    borderBottomLeftRadius: 120,
-    borderBottomRightRadius: 80,
-    height: 430,
-    left: 82,
-    opacity: 0.96,
-    position: 'absolute',
-    top: 120,
-    transform: [{ skewX: '-4deg' }],
-    width: 236,
-  },
-  currentPin: {
-    backgroundColor: '#000000',
-    borderColor: '#ffffff',
-    borderRadius: 15,
-    borderWidth: 5,
-    height: 30,
-    left: 206,
-    position: 'absolute',
-    top: 284,
-    width: 30,
-    zIndex: 3,
-  },
-  flightPath: {
-    backgroundColor: '#ffffff',
-    height: 2,
-    left: 230,
-    opacity: 0.9,
-    position: 'absolute',
-    top: 298,
-    transform: [{ rotate: '10deg' }],
-    width: 92,
-    zIndex: 2,
-  },
-  mapTag: {
-    backgroundColor: 'rgba(16, 16, 17, 0.62)',
-    borderColor: 'rgba(255, 218, 36, 0.54)',
-    borderRadius: 9,
-    borderWidth: 2,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    position: 'absolute',
-    zIndex: 5,
-  },
-  selectedMapTag: {
-    backgroundColor: '#050505',
-    borderColor: '#ffdf2d',
-    borderWidth: 3,
-  },
-  mapTagText: {
-    color: 'rgba(255, 226, 62, 0.72)',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  selectedMapTagText: {
-    color: '#ffdf2d',
-  },
-  timelineWrap: {
-    marginTop: -4,
-    paddingHorizontal: 28,
-    zIndex: 4,
-  },
-  legalText: {
-    color: '#dedee2',
-    fontSize: 14,
-    fontWeight: '700',
-    textDecorationLine: 'underline',
-  },
-  timelineTicks: {
-    alignItems: 'flex-end',
-    flexDirection: 'row',
-    height: 48,
-    justifyContent: 'space-between',
-    marginTop: 28,
-  },
-  tick: {
-    backgroundColor: '#f0f0f2',
-    borderRadius: 1,
-    height: 13,
-    opacity: 0.68,
-    width: 2,
-  },
-  majorTick: {
-    height: 35,
-    opacity: 0.9,
-  },
-  centerTick: {
-    height: 44,
-  },
-  timeLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  timeLabel: {
-    color: '#efeff3',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  cityCardsScroll: {
-    marginTop: 22,
-    zIndex: 6,
-  },
-  cityCards: {
-    gap: 18,
-    paddingHorizontal: 42,
-  },
-  cityCard: {
-    backgroundColor: '#060607',
-    borderRadius: 22,
-    gap: 8,
-    height: 142,
-    justifyContent: 'center',
-    padding: 18,
+    top: -120,
+    transform: [{ rotate: '34deg' }],
     width: 126,
   },
-  selectedCityCard: {
-    backgroundColor: '#f8f8fb',
+  skyBeamTwo: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    height: 460,
+    position: 'absolute',
+    right: -42,
+    top: -80,
+    transform: [{ rotate: '-24deg' }],
+    width: 96,
   },
-  cityBadge: {
-    alignSelf: 'flex-start',
-    borderColor: '#ffdf2d',
-    borderRadius: 8,
-    borderWidth: 3,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+  moon: {
+    alignSelf: 'center',
+    backgroundColor: '#fff7b5',
+    borderRadius: 105,
+    height: 210,
+    opacity: 0.95,
+    position: 'absolute',
+    top: 46,
+    width: 210,
   },
-  selectedCityBadge: {
-    backgroundColor: '#ffdf2d',
-    borderColor: '#1a1a1a',
+  statusRow: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 18,
+    zIndex: 4,
   },
-  cityBadgeText: {
-    color: '#ffdf2d',
-    fontSize: 16,
+  backButton: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(30, 29, 54, 0.68)',
+    borderRadius: 24,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
+  },
+  backText: {
+    color: '#ffffff',
+    fontSize: 30,
+    fontWeight: '300',
+    lineHeight: 34,
+  },
+  chapterBadge: {
+    backgroundColor: '#fffdf4',
+    borderRadius: 999,
+    paddingHorizontal: 20,
+    paddingVertical: 6,
+  },
+  chapterText: {
+    color: '#8b86a8',
+    fontSize: 12,
     fontWeight: '900',
   },
-  selectedCityBadgeText: {
-    color: '#111111',
+  coinBadge: {
+    alignItems: 'center',
+    backgroundColor: '#ffe05a',
+    borderColor: 'rgba(99, 72, 18, 0.24)',
+    borderRadius: 24,
+    borderWidth: 3,
+    height: 48,
+    justifyContent: 'center',
+    width: 48,
   },
-  cityName: {
+  coinText: {
+    color: '#6b4b13',
+    fontSize: 13,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '900',
+  },
+  questLabel: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(48, 45, 75, 0.78)',
+    borderRadius: 999,
+    marginTop: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    zIndex: 4,
+  },
+  questLabelText: {
     color: '#ffffff',
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 13,
+    fontWeight: '900',
   },
-  selectedCityName: {
-    color: '#111111',
+  hpPanel: {
+    alignSelf: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(67, 127, 199, 0.72)',
+    borderRadius: 160,
+    gap: 10,
+    marginTop: 12,
+    padding: 26,
+    width: 226,
+    zIndex: 4,
   },
-  cityTime: {
-    color: '#c9c9ce',
-    fontSize: 19,
-    fontWeight: '500',
+  hpHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
   },
-  selectedCityTime: {
-    color: '#68686f',
+  kicker: {
+    color: '#9da1c3',
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
   },
-  bookButton: {
+  hpValue: {
+    color: '#ffffff',
+    fontSize: 42,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '900',
+    lineHeight: 46,
+  },
+  hpUnit: {
+    color: '#d8e5ff',
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  energyText: {
+    backgroundColor: '#5b4ce6',
+    borderRadius: 999,
+    color: '#ffffff',
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '900',
+    overflow: 'hidden',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  daysLeft: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  progressCircleOuter: {
+    alignItems: 'center',
+    backgroundColor: 'rgba(211, 234, 255, 0.42)',
+    borderRadius: 86,
+    height: 146,
+    justifyContent: 'center',
+    width: 146,
+  },
+  progressCircleInner: {
+    alignItems: 'center',
+    backgroundColor: '#3d80cc',
+    borderRadius: 66,
+    height: 112,
+    justifyContent: 'center',
+    width: 112,
+  },
+  progressTrack: {
+    backgroundColor: 'rgba(255, 255, 255, 0.36)',
+    borderRadius: 999,
+    height: 10,
+    overflow: 'hidden',
+    width: '100%',
+  },
+  progressFill: {
+    backgroundColor: '#fff266',
+    borderRadius: 999,
+    height: '100%',
+  },
+  chapterLeft: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '900',
+    textAlign: 'center',
+  },
+  cityLayer: {
+    height: 158,
+    left: 0,
+    position: 'absolute',
+    right: 0,
+    top: 180,
+    zIndex: 2,
+  },
+  tower: {
+    backgroundColor: '#25446d',
+    bottom: 0,
+    position: 'absolute',
+  },
+  towerTall: {
+    borderTopLeftRadius: 14,
+    height: 118,
+    left: 82,
+    width: 40,
+  },
+  towerThin: {
+    height: 88,
+    left: 145,
+    width: 25,
+  },
+  towerWide: {
+    height: 72,
+    right: 92,
+    width: 58,
+  },
+  towerSmall: {
+    height: 96,
+    right: 42,
+    width: 36,
+  },
+  windowGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 5,
+    left: 92,
+    position: 'absolute',
+    top: 62,
+    width: 28,
+  },
+  windowDot: {
+    backgroundColor: '#ffe777',
+    height: 4,
+    width: 4,
+  },
+  mapStage: {
+    height: 374,
+    marginTop: -22,
+    position: 'relative',
+    zIndex: 3,
+  },
+  pathSegmentTop: {
+    backgroundColor: '#d7e7d9',
+    borderRadius: 38,
+    height: 68,
+    left: 128,
+    position: 'absolute',
+    top: 58,
+    transform: [{ rotate: '-18deg' }],
+    width: 214,
+  },
+  pathSegmentMid: {
+    backgroundColor: '#d7e7d9',
+    borderRadius: 36,
+    height: 68,
+    left: 70,
+    position: 'absolute',
+    top: 188,
+    transform: [{ rotate: '24deg' }],
+    width: 240,
+  },
+  pathSegmentLower: {
+    backgroundColor: '#d7e7d9',
+    borderRadius: 38,
+    height: 68,
+    left: 44,
+    position: 'absolute',
+    top: 300,
+    transform: [{ rotate: '-20deg' }],
+    width: 274,
+  },
+  pathCurveOne: {
+    backgroundColor: '#d7e7d9',
+    borderRadius: 80,
+    height: 120,
+    left: 236,
+    position: 'absolute',
+    top: 120,
+    width: 114,
+  },
+  pathCurveTwo: {
+    backgroundColor: '#d7e7d9',
+    borderRadius: 80,
+    height: 118,
+    left: 54,
+    position: 'absolute',
+    top: 244,
+    width: 118,
+  },
+  rewardNode: {
+    alignItems: 'center',
+    backgroundColor: '#ffe46a',
+    borderColor: '#c8a941',
+    borderRadius: 28,
+    borderWidth: 4,
+    height: 58,
+    justifyContent: 'center',
+    position: 'absolute',
+    width: 58,
+    zIndex: 6,
+  },
+  rewardNodeActive: {
+    backgroundColor: '#ffffff',
+    borderColor: '#ff55cf',
+    transform: [{ scale: 1.08 }],
+  },
+  rewardNodeText: {
+    color: '#715515',
+    fontSize: 13,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '900',
+  },
+  rewardNodeTextActive: {
+    color: '#2a2147',
+  },
+  mascot: {
+    backgroundColor: '#ffffff',
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    borderTopLeftRadius: 36,
+    borderTopRightRadius: 36,
+    bottom: 22,
+    height: 64,
+    left: 116,
+    position: 'absolute',
+    width: 48,
+    zIndex: 7,
+  },
+  mascotFace: {
+    backgroundColor: '#ff879e',
+    borderRadius: 4,
+    height: 8,
+    left: 20,
+    position: 'absolute',
+    top: 24,
+    width: 8,
+  },
+  rewardCard: {
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.94)',
+    borderRadius: 24,
+    gap: 14,
+    marginTop: -12,
+    padding: 18,
+    width: '88%',
+    zIndex: 8,
+  },
+  rewardCardHeader: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  rewardTitle: {
+    color: '#25233f',
+    fontSize: 24,
+    fontWeight: '900',
+  },
+  rewardPill: {
+    backgroundColor: '#241f3d',
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  rewardPillText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '900',
+  },
+  rewardDetail: {
+    color: '#60647b',
+    fontSize: 15,
+    fontWeight: '800',
+    lineHeight: 22,
+  },
+  rewardStats: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  rewardStat: {
+    backgroundColor: '#f1f3fb',
+    borderRadius: 14,
+    flex: 1,
+    gap: 4,
+    padding: 10,
+  },
+  statLabel: {
+    color: '#858aa1',
+    fontSize: 11,
+    fontWeight: '900',
+    textTransform: 'uppercase',
+  },
+  statValue: {
+    color: '#25233f',
+    fontSize: 16,
+    fontVariant: ['tabular-nums'],
+    fontWeight: '900',
+  },
+  startButton: {
     alignItems: 'center',
     alignSelf: 'center',
     backgroundColor: '#ffffff',
-    borderRadius: 36,
-    height: 72,
+    borderRadius: 34,
+    height: 68,
     justifyContent: 'center',
-    marginTop: 36,
-    width: '82%',
-    zIndex: 7,
+    marginTop: 20,
+    width: '84%',
+    zIndex: 9,
   },
-  bookText: {
-    color: '#111111',
-    fontSize: 24,
-    fontWeight: '600',
+  startButtonText: {
+    color: '#25233f',
+    fontSize: 19,
+    fontWeight: '900',
   },
 });
