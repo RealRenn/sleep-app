@@ -630,10 +630,13 @@ function WeeklyTrendChart({ graph }: { graph: WeeklyGraphConfig }) {
     <Text selectable style={styles.axisTitle}>{axis}</Text>
     <View style={styles.graphBody}>
       <View style={styles.graphScale}>{ticks.map((tick) => <Text key={tick} selectable style={styles.graphScaleText}>{tick}{unit}</Text>)}</View>
-      <View onLayout={(event) => setPlotWidth(event.nativeEvent.layout.width)} style={styles.graphPlot}>
-        {ticks.map((_, index) => <View key={index} style={[styles.graphGridLine, { top: `${(index / (ticks.length - 1)) * 100}%` }]} />)}
-        {plotWidth > 0 ? segments.map((segment, index) => <View key={index} style={[styles.graphLine, { left: segment.left, top: segment.top, transform: [{ rotate: segment.rotate }], width: segment.width }]} />) : null}
-        {plotWidth > 0 ? points.map((point) => <View key={point.label} style={[styles.graphPointColumn, { left: point.x, top: point.y }]}><Text selectable style={styles.graphValue}>{point.value}{unit}</Text><View style={styles.graphPoint} /><Text selectable style={styles.graphDay}>{point.label}</Text></View>) : null}
+      <View style={styles.graphRight}>
+        <View onLayout={(event) => setPlotWidth(event.nativeEvent.layout.width)} style={styles.graphPlot}>
+          {ticks.map((_, index) => <View key={index} style={[styles.graphGridLine, { top: `${(index / (ticks.length - 1)) * 100}%` }]} />)}
+          {plotWidth > 0 ? segments.map((segment, index) => <View key={index} style={[styles.graphLine, { left: segment.left, top: segment.top, transform: [{ rotate: segment.rotate }], width: segment.width }]} />) : null}
+          {plotWidth > 0 ? points.map((point) => <View key={point.label} style={[styles.graphPointColumn, { left: point.x, top: point.y }]}><Text selectable style={styles.graphValue}>{point.value}{unit}</Text><View style={styles.graphPoint} /></View>) : null}
+        </View>
+        <View style={styles.graphDaysRow}>{labels.map((label) => <Text key={label} selectable style={styles.graphDay}>{label}</Text>)}</View>
       </View>
     </View>
     <Text selectable style={styles.xAxisTitle}>DAYS</Text>
@@ -823,13 +826,15 @@ const styles = StyleSheet.create({
   graphBody: { alignSelf: 'stretch', flexDirection: 'row', gap: 8, height: 222 },
   graphScale: { height: 190, justifyContent: 'space-between', paddingBottom: 1, width: 25 },
   graphScaleText: { color: '#657189', fontSize: 10, fontVariant: ['tabular-nums'], fontWeight: '900', textAlign: 'right' },
-  graphPlot: { flex: 1, height: 190, position: 'relative' },
+  graphRight: { flex: 1 },
+  graphPlot: { height: 190, position: 'relative' },
   graphGridLine: { backgroundColor: '#cbd5e1', height: 1.5, left: 0, position: 'absolute', right: 0 },
   graphLine: { backgroundColor: '#3378d8', height: 4, position: 'absolute', transformOrigin: 'left center' },
-  graphPointColumn: { alignItems: 'center', marginLeft: -18, marginTop: -8, position: 'absolute', width: 36 },
+  graphPointColumn: { alignItems: 'center', marginLeft: -18, marginTop: -22, position: 'absolute', width: 36 },
   graphPoint: { backgroundColor: '#3378d8', borderColor: '#ffffff', borderRadius: 8, borderWidth: 2, height: 13, marginTop: 2, width: 13 },
   graphValue: { color: '#152033', fontSize: 10, fontVariant: ['tabular-nums'], fontWeight: '900', marginBottom: 1 },
-  graphDay: { color: '#657189', fontSize: 10, fontWeight: '900', marginTop: 184, position: 'absolute' },
+  graphDaysRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 10, paddingHorizontal: 1 },
+  graphDay: { color: '#657189', fontSize: 10, fontWeight: '900', textAlign: 'center', width: 30 },
   xAxisTitle: { color: '#657189', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 },
   focusGraphSummary: { backgroundColor: '#f4f0ff', borderRadius: 8, flexDirection: 'row', justifyContent: 'space-between', marginTop: 2, padding: 14 },
   graphSummaryValue: { color: '#152033', fontSize: 18, fontVariant: ['tabular-nums'], fontWeight: '900', marginTop: 4 },
