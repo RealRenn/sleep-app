@@ -442,23 +442,30 @@ export default function BalanceHomeScreen() {
         {page === 'analytics' ? (
           <View>
             <SectionTitle title="Stats" meta="This week" />
+            <View style={styles.questHero}>
+              <View style={styles.questGlowOne} /><View style={styles.questGlowTwo} />
+              <View style={styles.questHeroTop}><View><Text selectable style={styles.questKicker}>SLEEP QUEST · CHAPTER 02</Text><Text selectable style={styles.questTitle}>Dreamland awaits</Text><Text selectable style={styles.questCopy}>Keep your rhythm steady to unlock your next reward.</Text></View><View style={styles.questMoon}><Text style={styles.questMoonText}>☾</Text></View></View>
+              <View style={styles.questProgressHead}><Text selectable style={styles.questProgressText}>1,240 points to next reward</Text><Text selectable style={styles.questProgressText}>62%</Text></View>
+              <View style={styles.questTrack}><View style={styles.questFill} /><View style={styles.questMarker}><Text style={styles.questMarkerText}>★</Text></View></View>
+              <View style={styles.questStops}><Text selectable style={styles.questStopDone}>●</Text><Text selectable style={styles.questStopDone}>●</Text><Text selectable style={styles.questStopNext}>○</Text><Text selectable style={styles.questStopNext}>○</Text></View>
+            </View>
             <View style={styles.statsRewardPanel}>
               <View style={styles.panelHead}>
                 <View>
-                  <Text selectable style={styles.kicker}>Completed tasks</Text>
-                  <Text selectable style={styles.panelTitle}>{rewardProgress.completedTasks} tasks finished</Text>
+                  <Text selectable style={styles.kicker}>Your wellbeing stash</Text>
+                  <Text selectable style={styles.panelTitle}>{rewardProgress.coins.toLocaleString()} glow coins</Text>
                 </View>
                 <View style={styles.statsHpBadge}>
-                  <Text selectable style={styles.statsHpText}>{rewardProgress.totalHealth.toLocaleString()} HP</Text>
+                  <Text selectable style={styles.statsHpText}>✦ {rewardProgress.totalHealth.toLocaleString()}</Text>
                 </View>
               </View>
               <View style={styles.statsRewardGrid}>
                 <View style={styles.statsMiniCard}>
-                  <Text selectable style={styles.metricLabel}>Points earned</Text>
+                  <Text selectable style={styles.metricLabel}>Glow points</Text>
                   <Text selectable style={styles.metricValue}>{rewardProgress.totalHealth.toLocaleString()}</Text>
                 </View>
                 <View style={styles.statsMiniCard}>
-                  <Text selectable style={styles.metricLabel}>Coins</Text>
+                  <Text selectable style={styles.metricLabel}>Coins saved</Text>
                   <Text selectable style={styles.metricValue}>{rewardProgress.coins.toLocaleString()}</Text>
                 </View>
                 <View style={styles.statsMiniCard}>
@@ -470,18 +477,18 @@ export default function BalanceHomeScreen() {
 
             <View style={styles.redeemPanel}>
               <View style={styles.panelHead}>
-                <View>
-                  <Text selectable style={styles.kicker}>Rewards shop</Text>
-                  <Text selectable style={styles.panelTitle}>Redeem points</Text>
-                </View>
-                <Text selectable style={styles.availablePoints}>{rewardProgress.totalHealth.toLocaleString()} HP available</Text>
+                <View><Text selectable style={styles.kicker}>Rewards shop</Text><Text selectable style={styles.panelTitle}>Pick a little treat</Text></View>
+                <Text selectable style={styles.availablePoints}>✦ {rewardProgress.totalHealth.toLocaleString()}</Text>
               </View>
+              <Text selectable style={styles.redeemIntro}>Healthy choices earn glow points. Spend them on something that makes your day brighter.</Text>
               <View style={styles.redeemList}>
-                {REDEEM_REWARDS.map((reward) => {
+                {REDEEM_REWARDS.map((reward, index) => {
                   const canRedeem = rewardProgress.totalHealth >= reward.cost;
+                  const icons = ['☕', '♫', '✦'];
 
                   return (
-                    <View key={reward.id} style={styles.redeemRow}>
+                    <View key={reward.id} style={[styles.redeemRow, index === 1 && styles.redeemRowCoral, index === 2 && styles.redeemRowPurple]}>
+                      <View style={[styles.rewardIcon, index === 1 && styles.rewardIconCoral, index === 2 && styles.rewardIconPurple]}><Text style={styles.rewardIconText}>{icons[index] ?? '✦'}</Text></View>
                       <View style={styles.redeemTextBlock}>
                         <Text selectable style={styles.redeemTitle}>{reward.title}</Text>
                         <Text selectable style={styles.muted}>{reward.detail}</Text>
@@ -638,7 +645,7 @@ function NavButton({ label, active, onPress }: { label: string; active: boolean;
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#eef4f7' },
+  root: { flex: 1, backgroundColor: '#eef0ff' },
   signInRoot: { flex: 1, backgroundColor: '#0f1726' },
   signInContent: { flexGrow: 1, justifyContent: 'center', paddingHorizontal: 22 },
   signInHero: { alignItems: 'center', gap: 12, marginBottom: 28 },
@@ -660,7 +667,7 @@ const styles = StyleSheet.create({
   title: { color: '#152033', fontSize: 30, fontWeight: '900', lineHeight: 32 },
   sleepButton: { alignItems: 'center', backgroundColor: '#152033', borderRadius: 8, height: 48, justifyContent: 'center', width: 48 },
   sleepButtonText: { color: '#ffffff', fontSize: 16, fontWeight: '900' },
-  panel: { backgroundColor: '#ffffff', borderColor: '#e4e9f1', borderRadius: 8, borderWidth: 1, padding: 18, boxShadow: '0 14px 34px rgba(40,55,85,0.12)' },
+  panel: { backgroundColor: '#ffffff', borderColor: '#e1e0f5', borderRadius: 20, borderWidth: 1, padding: 18, boxShadow: '0 14px 34px rgba(55,46,110,0.12)' },
   panelHead: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between' },
   panelTitle: { color: '#152033', fontSize: 21, fontWeight: '900' },
   panelStrong: { color: '#152033', fontSize: 20, fontWeight: '900' },
@@ -702,7 +709,7 @@ const styles = StyleSheet.create({
   cardText: { flex: 1 },
   cardTitle: { color: '#152033', fontSize: 16, fontWeight: '900', marginBottom: 4 },
   tag: { backgroundColor: '#f0edff', borderRadius: 999, color: '#6753dd', fontSize: 11, fontWeight: '900', paddingHorizontal: 8, paddingVertical: 5 },
-  smartPanel: { alignItems: 'center', backgroundColor: '#6753dd', borderRadius: 8, flexDirection: 'row', gap: 14, marginTop: 18, padding: 16 },
+  smartPanel: { alignItems: 'center', backgroundColor: '#6753dd', borderRadius: 20, flexDirection: 'row', gap: 14, marginTop: 18, padding: 16 },
   smartText: { flex: 1 },
   smartKicker: { color: 'rgba(255,255,255,0.78)', fontSize: 13, fontWeight: '800', textTransform: 'uppercase' },
   smartTitle: { color: '#ffffff', fontSize: 21, fontWeight: '900' },
@@ -745,18 +752,43 @@ const styles = StyleSheet.create({
   deleteTaskText: { color: '#df6689', fontSize: 13, fontWeight: '900' },
   deleteTaskWideButton: { alignItems: 'center', alignSelf: 'flex-start', borderColor: '#ffd8df', borderRadius: 8, borderWidth: 1, minHeight: 42, justifyContent: 'center', paddingHorizontal: 18 },
   deleteTaskWideText: { color: '#df6689', fontSize: 14, fontWeight: '900' },
-  statsRewardPanel: { backgroundColor: '#ffffff', borderColor: '#e4e9f1', borderRadius: 8, borderWidth: 1, gap: 14, marginBottom: 14, padding: 18, boxShadow: '0 14px 34px rgba(40,55,85,0.12)' },
-  statsHpBadge: { alignItems: 'center', backgroundColor: '#152033', borderRadius: 8, minHeight: 44, justifyContent: 'center', paddingHorizontal: 14 },
+  questHero: { backgroundColor: '#17234a', borderRadius: 24, marginBottom: 14, overflow: 'hidden', padding: 20 },
+  questGlowOne: { backgroundColor: '#7b61ff', borderRadius: 110, height: 220, opacity: 0.68, position: 'absolute', right: -82, top: -94, width: 220 },
+  questGlowTwo: { backgroundColor: '#ff7a91', borderRadius: 80, bottom: -58, height: 150, left: -64, opacity: 0.52, position: 'absolute', width: 150 },
+  questHeroTop: { alignItems: 'flex-start', flexDirection: 'row', gap: 12, justifyContent: 'space-between' },
+  questKicker: { color: '#c8c1ff', fontSize: 11, fontWeight: '900', letterSpacing: 0.7 },
+  questTitle: { color: '#ffffff', fontSize: 27, fontWeight: '900', marginTop: 6 },
+  questCopy: { color: '#d9e0ff', fontSize: 13, fontWeight: '700', lineHeight: 19, marginTop: 6, maxWidth: '80%' },
+  questMoon: { alignItems: 'center', backgroundColor: '#fff2a8', borderRadius: 34, height: 62, justifyContent: 'center', width: 62 },
+  questMoonText: { color: '#644ed4', fontSize: 36, fontWeight: '900', marginTop: -4 },
+  questProgressHead: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 24 },
+  questProgressText: { color: '#ffffff', fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '900' },
+  questTrack: { backgroundColor: 'rgba(255,255,255,0.25)', borderRadius: 10, height: 11, marginTop: 8, overflow: 'visible' },
+  questFill: { backgroundColor: '#fff2a8', borderRadius: 10, height: '100%', width: '62%' },
+  questMarker: { alignItems: 'center', backgroundColor: '#ff7a91', borderColor: '#ffffff', borderRadius: 13, borderWidth: 2, height: 26, justifyContent: 'center', left: '58%', position: 'absolute', top: -8, width: 26 },
+  questMarkerText: { color: '#ffffff', fontSize: 12 },
+  questStops: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 12 },
+  questStopDone: { color: '#fff2a8', fontSize: 14 },
+  questStopNext: { color: '#bdb6ed', fontSize: 14 },
+  statsRewardPanel: { backgroundColor: '#ffffff', borderColor: '#e1e0f5', borderRadius: 20, borderWidth: 1, gap: 14, marginBottom: 14, padding: 18, boxShadow: '0 14px 34px rgba(64,51,120,0.12)' },
+  statsHpBadge: { alignItems: 'center', backgroundColor: '#ff7a91', borderRadius: 16, minHeight: 44, justifyContent: 'center', paddingHorizontal: 14 },
   statsHpText: { color: '#ffffff', fontSize: 15, fontVariant: ['tabular-nums'], fontWeight: '900' },
   statsRewardGrid: { flexDirection: 'row', gap: 10 },
-  statsMiniCard: { backgroundColor: '#eef4f7', borderColor: '#dbe4ef', borderRadius: 8, borderWidth: 1, flex: 1, gap: 6, padding: 12 },
-  redeemPanel: { backgroundColor: '#ffffff', borderColor: '#e4e9f1', borderRadius: 8, borderWidth: 1, gap: 14, marginBottom: 14, padding: 18, boxShadow: '0 14px 34px rgba(40,55,85,0.12)' },
-  availablePoints: { backgroundColor: '#f0edff', borderRadius: 999, color: '#6753dd', fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '900', overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 7 },
+  statsMiniCard: { backgroundColor: '#f5f2ff', borderColor: '#e1dcff', borderRadius: 14, borderWidth: 1, flex: 1, gap: 6, padding: 12 },
+  redeemPanel: { backgroundColor: '#ffffff', borderColor: '#e1e0f5', borderRadius: 20, borderWidth: 1, gap: 14, marginBottom: 14, padding: 18, boxShadow: '0 14px 34px rgba(64,51,120,0.12)' },
+  availablePoints: { backgroundColor: '#fff2a8', borderRadius: 999, color: '#6348c9', fontSize: 12, fontVariant: ['tabular-nums'], fontWeight: '900', overflow: 'hidden', paddingHorizontal: 10, paddingVertical: 7 },
+  redeemIntro: { color: '#657189', fontSize: 14, fontWeight: '700', lineHeight: 20 },
   redeemList: { gap: 10 },
-  redeemRow: { alignItems: 'center', backgroundColor: '#f8fafc', borderColor: '#e4e9f1', borderRadius: 8, borderWidth: 1, flexDirection: 'row', gap: 12, padding: 12 },
+  redeemRow: { alignItems: 'center', backgroundColor: '#eef8ff', borderColor: '#d5eafa', borderRadius: 16, borderWidth: 1, flexDirection: 'row', gap: 12, padding: 12 },
+  redeemRowCoral: { backgroundColor: '#fff0f3', borderColor: '#ffd6df' },
+  redeemRowPurple: { backgroundColor: '#f3efff', borderColor: '#dfd5ff' },
+  rewardIcon: { alignItems: 'center', backgroundColor: '#4ba8db', borderRadius: 16, height: 46, justifyContent: 'center', width: 46 },
+  rewardIconCoral: { backgroundColor: '#ff7a91' },
+  rewardIconPurple: { backgroundColor: '#7b61ff' },
+  rewardIconText: { color: '#ffffff', fontSize: 21 },
   redeemTextBlock: { flex: 1 },
   redeemTitle: { color: '#152033', fontSize: 16, fontWeight: '900', marginBottom: 4 },
-  redeemButton: { alignItems: 'center', backgroundColor: '#6753dd', borderRadius: 8, minHeight: 42, justifyContent: 'center', minWidth: 82, paddingHorizontal: 12 },
+  redeemButton: { alignItems: 'center', backgroundColor: '#17234a', borderRadius: 14, minHeight: 42, justifyContent: 'center', minWidth: 82, paddingHorizontal: 12 },
   redeemButtonDisabled: { backgroundColor: '#e4e9f1' },
   redeemButtonText: { color: '#ffffff', fontSize: 13, fontVariant: ['tabular-nums'], fontWeight: '900' },
   redeemButtonTextDisabled: { color: '#768399' },
